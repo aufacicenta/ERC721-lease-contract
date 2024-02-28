@@ -2,8 +2,9 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/utils/Context.sol";
 
-contract Lease {
+contract Lease is Context {
   ERC721 public asset;
   uint256 public tokenId;
   address public tenant;
@@ -28,7 +29,7 @@ contract Lease {
    * @param _hours Number of hours the client is buying.
    */
   function rent(uint256 _hours) public payable {
-    require(msg.sender != address(0), "ERR_INVALID_ADDRESS");
+    require(_msgSender() != address(0), "ERR_INVALID_ADDRESS");
     require(tenant == address(0), "ERR_ALREADY_RENTED");
 
     uint256 totalPricePerHour = _hours * pricePerHour;
@@ -36,7 +37,7 @@ contract Lease {
     require(msg.value == totalPricePerHour, "ERR_INVALID_PRICE_PER_HOUR_AMOUNT");
 
     duration = block.timestamp + (_hours * 1 hours);
-    tenant = msg.sender;
+    tenant = _msgSender();
 
     asset.approve(tenant, tokenId);
   }
