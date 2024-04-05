@@ -1,13 +1,6 @@
-# Sample Hardhat Project
+## Lease721
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
+Solidity smart-contract protocol for timed ERC721 renting. Set your hourly price of any of your ERC721. Lease721 handles
+expiration, allowance and payments automatically.
 
-Try running some of the following tasks:
-
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat run scripts/deploy.ts
-```
+The tenant will have full access to your ERC721 asset until the period is complete.

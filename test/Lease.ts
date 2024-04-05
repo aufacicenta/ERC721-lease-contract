@@ -5,7 +5,7 @@ import { expect } from "chai";
 import moment from "moment";
 import { BigNumber, BigNumberish } from "ethers";
 import { ethers, network } from "hardhat";
-import { DummyERC721, Lease } from "../typechain-types";
+import { DummyERC721, Lease as Lease721 } from "../typechain-types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 const DAO_ACCOUNT_ID = "dao_account.eth";
@@ -49,7 +49,7 @@ async function createERC721Contract() {
 async function createLeaseContract(overrides?: Record<string, any>) {
   const [assetAccountId] = await ethers.getSigners();
 
-  const Lease = await ethers.getContractFactory("Lease");
+  const Lease = await ethers.getContractFactory("Lease721");
 
   const _asset = overrides?.asset || assetAccountId;
   const _tokenId = overrides?.tokenId || 0;
@@ -241,5 +241,135 @@ describe("Lease", function () {
     await leaseContract.connect(tenant).rent(1n, { value: 1n });
 
     await expect(leaseContract.connect(whoever).rent(1)).to.be.revertedWith("ERR_ALREADY_RENTED");
+  });
+
+  it("claimBalance: transfer balance to owner", async function () {
+    const [, , owner, tenant] = await ethers.getSigners();
+
+    const ERC721 = await createERC721Contract();
+
+    const NFTAddress = await ERC721.getAddress();
+
+    const leaseContract = await createLeaseContract({
+      asset: NFTAddress,
+      tokenId: 0,
+      pricePerHour: 1,
+    });
+
+    const leaseContractAddress = await leaseContract.getAddress();
+
+    console.log({ leaseContractAddress, owner: owner.address });
+
+    await ERC721.connect(owner).setApprovalForAll(leaseContractAddress, true);
+
+    const approvedAddress = await ERC721.getApproved(0);
+    const isApprovedForAll = await ERC721.isApprovedForAll(owner.address, leaseContractAddress);
+    const ownerOf = await ERC721.ownerOf(0);
+
+    console.log({ approvedAddress, ownerOf, isApprovedForAll });
+
+    expect(owner).to.equal(ownerOf);
+    expect(isApprovedForAll).to.be.true;
+
+    await leaseContract.connect(tenant).rent(1n, { value: 1n });
+
+    const duration = await leaseContract.duration();
+    const blockTimestamp = await getBlockTimestamp();
+
+    await network.provider.send("evm_setNextBlockTimestamp", [
+      moment
+        .unix(Number(duration) + blockTimestamp)
+        .add(1, "minute")
+        .unix(),
+    ]);
+
+    await leaseContract.terminate();
+
+    const balanceBefore = await ethers.provider.getBalance(owner.address);
+
+    await leaseContract.claimBalance();
+
+    const balanceAfter = await ethers.provider.getBalance(owner.address);
+
+    expect(balanceAfter).to.equal(balanceBefore + 1n);
+  });
+
+  it("claimBalance: errors with NO_BALANCE_TO_CLAIM", async function () {
+    const [, , owner, tenant] = await ethers.getSigners();
+
+    const ERC721 = await createERC721Contract();
+
+    const NFTAddress = await ERC721.getAddress();
+
+    const leaseContract = await createLeaseContract({
+      asset: NFTAddress,
+      tokenId: 0,
+      pricePerHour: 1,
+    });
+
+    const leaseContractAddress = await leaseContract.getAddress();
+
+    console.log({ leaseContractAddress, owner: owner.address });
+
+    await ERC721.connect(owner).setApprovalForAll(leaseContractAddress, true);
+
+    const approvedAddress = await ERC721.getApproved(0);
+    const isApprovedForAll = await ERC721.isApprovedForAll(owner.address, leaseContractAddress);
+    const ownerOf = await ERC721.ownerOf(0);
+
+    console.log({ approvedAddress, ownerOf, isApprovedForAll });
+
+    expect(owner).to.equal(ownerOf);
+    expect(isApprovedForAll).to.be.true;
+
+    await leaseContract.connect(tenant).rent(1n, { value: 1n });
+
+    const duration = await leaseContract.duration();
+    const blockTimestamp = await getBlockTimestamp();
+
+    await network.provider.send("evm_setNextBlockTimestamp", [
+      moment
+        .unix(Number(duration) + blockTimestamp)
+        .add(1, "minute")
+        .unix(),
+    ]);
+
+    await leaseContract.terminate();
+
+    await leaseContract.claimBalance();
+    await expect(leaseContract.claimBalance()).to.be.revertedWith("ERR_NO_BALANCE_TO_CLAIM");
+  });
+
+  it("claimBalance: errors with ERR_LEASE_NOT_TERMINATED", async function () {
+    const [, , owner, tenant] = await ethers.getSigners();
+
+    const ERC721 = await createERC721Contract();
+
+    const NFTAddress = await ERC721.getAddress();
+
+    const leaseContract = await createLeaseContract({
+      asset: NFTAddress,
+      tokenId: 0,
+      pricePerHour: 1,
+    });
+
+    const leaseContractAddress = await leaseContract.getAddress();
+
+    console.log({ leaseContractAddress, owner: owner.address });
+
+    await ERC721.connect(owner).setApprovalForAll(leaseContractAddress, true);
+
+    const approvedAddress = await ERC721.getApproved(0);
+    const isApprovedForAll = await ERC721.isApprovedForAll(owner.address, leaseContractAddress);
+    const ownerOf = await ERC721.ownerOf(0);
+
+    console.log({ approvedAddress, ownerOf, isApprovedForAll });
+
+    expect(owner).to.equal(ownerOf);
+    expect(isApprovedForAll).to.be.true;
+
+    await leaseContract.connect(tenant).rent(1n, { value: 1n });
+
+    await expect(leaseContract.claimBalance()).to.be.revertedWith("ERR_LEASE_NOT_TERMINATED");
   });
 });

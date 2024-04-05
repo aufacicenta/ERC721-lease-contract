@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
-contract Lease is Context {
+contract Lease721 is Context {
   ERC721 public asset;
   uint256 public tokenId;
   address public tenant;
@@ -50,5 +50,20 @@ contract Lease is Context {
 
     tenant = address(0);
     asset.approve(address(0), tokenId);
+  }
+
+  /**
+   * @dev Allows the ERC721 owner to claim the total balance accumulated from rent of this tokenId.
+   * @dev Can be called by anyone, but only the owner of the ERC721 token will receive the balance.
+   */
+  function claimBalance() public {
+    require(tenant == address(0), "ERR_LEASE_NOT_TERMINATED");
+
+    uint256 balance = address(this).balance;
+    require(balance > 0, "ERR_NO_BALANCE_TO_CLAIM");
+
+    address owner = ERC721(asset).ownerOf(tokenId);
+
+    payable(owner).transfer(balance);
   }
 }
